@@ -1,0 +1,73 @@
+name: Visit With Us MLOps Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+
+  data-prep:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pandas scikit-learn
+
+      - name: Verify project files
+        run: |
+          ls -R tourism_project
+
+      - name: Run data preparation
+        run: |
+          python tourism_project/model_building/data_prep.py
+
+      - name: Verify train and test datasets
+        run: |
+          ls -lh tourism_project/data/train.csv
+          ls -lh tourism_project/data/test.csv
+
+      - name: Upload train and test datasets
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-splits
+          path: |
+            tourism_project/data/train.csv
+            tourism_project/data/test.csv
+
+
+  model-training:
+    runs-on: ubuntu-latest
+
+    needs: data-prep
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download train and test datasets
+        uses: actions/download-artifact@v4
+        with:
+          name: data-splits
+          path: tourism_project/data
+
+      - name: Verify downloaded datasets
+        run: |
+          ls -lh tourism_project/data
