@@ -4,40 +4,58 @@ on:
   push:
     branches:
       - main
+
   workflow_dispatch:
 
 jobs:
 
   data-prep:
+
     runs-on: ubuntu-latest
 
     steps:
 
+      # Step 1: Download repository files to GitHub Actions runner
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Step 2: Check repository structure
+      - name: Verify project files
+        run: |
+          echo "Current directory:"
+          pwd
+
+          echo ""
+          echo "Repository files:"
+          ls -la
+
+          echo ""
+          echo "Tourism project structure:"
+          ls -R tourism_project
+
+      # Step 3: Install Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # Step 4: Install required packages
       - name: Install dependencies
         run: |
           pip install pandas scikit-learn
 
-      - name: Verify project files
-        run: |
-          ls -R tourism_project
-
+      # Step 5: Run data preparation
       - name: Run data preparation
         run: |
           python tourism_project/model_building/data_prep.py
 
-      - name: Verify train and test datasets
+      # Step 6: Verify train and test files
+      - name: Verify generated datasets
         run: |
-          ls -lh tourism_project/data/train.csv
-          ls -lh tourism_project/data/test.csv
+          echo "Files inside tourism_project/data:"
+          ls -lh tourism_project/data
 
+      # Step 7: Upload train and test datasets as artifact
       - name: Upload train and test datasets
         uses: actions/upload-artifact@v4
         with:
@@ -48,26 +66,26 @@ jobs:
 
 
   model-training:
+
     runs-on: ubuntu-latest
 
     needs: data-prep
 
     steps:
 
+      # Step 8: Checkout repository again
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
+      # Step 9: Download artifact from data-prep job
       - name: Download train and test datasets
         uses: actions/download-artifact@v4
         with:
           name: data-splits
           path: tourism_project/data
 
+      # Step 10: Verify downloaded files
       - name: Verify downloaded datasets
         run: |
+          echo "Files downloaded into tourism_project/data:"
           ls -lh tourism_project/data
