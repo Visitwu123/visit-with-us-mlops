@@ -1,91 +1,59 @@
-name: Visit With Us MLOps Pipeline
+model-training:
 
-on:
-  push:
-    branches:
-      - main
+  runs-on: ubuntu-latest
 
-  workflow_dispatch:
+  needs: data-prep
 
-jobs:
+  steps:
 
-  data-prep:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-    runs-on: ubuntu-latest
+    - name: Download train and test datasets
+      uses: actions/download-artifact@v4
+      with:
+        name: data-splits
+        path: tourism_project/data
 
-    steps:
+    - name: Verify downloaded datasets
+      run: |
+        echo "Downloaded datasets:"
+        ls -lh tourism_project/data
 
-      # Step 1: Download repository files to GitHub Actions runner
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
 
-      # Step 2: Check repository structure
-      - name: Verify project files
-        run: |
-          echo "Current directory:"
-          pwd
+    - name: Install dependencies
+      run: |
+        pip install pandas scikit-learn mlflow joblib
 
-          echo ""
-          echo "Repository files:"
-          ls -la
+    - name: Run model training
+      run: |
+        python tourism_project/model_building/model_train.py
 
-          echo ""
-          echo "Tourism project structure:"
-          ls -R tourism_project
+    - name: Verify saved model
+      run: |
+        echo "Model files:"
+        ls -lh tourism_project/model_building/
 
-      # Step 3: Install Python
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+    - name: Upload MLflow tracking
+      uses: actions/upload-artifact@v4
+      with:
+        name: mlflow-tracking
+        path: mlruns/
 
-      # Step 4: Install required packages
-      - name: Install dependencies
-        run: |
-          pip install pandas scikit-learn
+    - name: Commit best model
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      # Step 5: Run data preparation
-      - name: Run data preparation
-        run: |
-          python tourism_project/model_building/data_prep.py
+        git add tourism_project/model_building/best_model.joblib
 
-      # Step 6: Verify train and test files
-      - name: Verify generated datasets
-        run: |
-          echo "Files inside tourism_project/data:"
-          ls -lh tourism_project/data
-
-      # Step 7: Upload train and test datasets as artifact
-      - name: Upload train and test datasets
-        uses: actions/upload-artifact@v4
-        with:
-          name: data-splits
-          path: |
-            tourism_project/data/train.csv
-            tourism_project/data/test.csv
-
-
-  model-training:
-
-    runs-on: ubuntu-latest
-
-    needs: data-prep
-
-    steps:
-
-      # Step 8: Checkout repository again
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # Step 9: Download artifact from data-prep job
-      - name: Download train and test datasets
-        uses: actions/download-artifact@v4
-        with:
-          name: data-splits
-          path: tourism_project/data
-
-      # Step 10: Verify downloaded files
-      - name: Verify downloaded datasets
-        run: |
-          echo "Files downloaded into tourism_project/data:"
-          ls -lh tourism_project/data
+        if git diff --cached --quiet; then
+          echo "No model changes to commit."
+        else
+          git commit -m "Update best model"
+          git push
+        fi
