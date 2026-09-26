@@ -57,3 +57,42 @@ model-training:
           git commit -m "Update best model"
           git push
         fi
+
+  app-validation:
+
+    runs-on: ubuntu-latest
+
+    needs: model-training
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Verify deployment files
+        run: |
+          echo "Checking Streamlit application..."
+          test -f app.py
+
+          echo "Checking requirements..."
+          test -f requirements.txt
+
+          echo "Checking model..."
+          test -f tourism_project/model_building/best_model.joblib
+
+      - name: Test model loading
+        run: |
+          python -c "import joblib; joblib.load('tourism_project/model_building/best_model.joblib'); print('Model loaded successfully.')"
+
+      - name: Validate Streamlit application
+        run: |
+          python -m py_compile app.py
