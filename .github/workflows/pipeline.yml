@@ -10,12 +10,11 @@ on:
 permissions:
   contents: write
 
-
-# -----------------------------------------
-# STEP 1: DATA PREPARATION
-# -----------------------------------------
-
 jobs:
+
+  # -----------------------------------------
+  # STEP 1: DATA PREPARATION
+  # -----------------------------------------
 
   data-prep:
 
@@ -64,65 +63,64 @@ jobs:
           path: |
             tourism_project/data/train.csv
             tourism_project/data/test.csv
+
+
+  # -----------------------------------------
+  # STEP 2: MODEL TRAINING
+  # -----------------------------------------
+
   model-training:
 
-  runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-  needs: data-prep
+    needs: data-prep
 
-  steps:
+    steps:
 
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Download train and test datasets
-      uses: actions/download-artifact@v4
-      with:
-        name: data-splits
-        path: tourism_project/data
+      - name: Download train and test datasets
+        uses: actions/download-artifact@v4
+        with:
+          name: data-splits
+          path: tourism_project/data
 
-    - name: Verify downloaded datasets
-      run: |
-        echo "Downloaded datasets:"
-        ls -lh tourism_project/data
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Install model dependencies
+        run: |
+          pip install pandas scikit-learn mlflow joblib
 
-    - name: Install dependencies
-      run: |
-        pip install pandas scikit-learn mlflow joblib
+      - name: Verify datasets
+        run: |
+          echo "Downloaded datasets:"
+          ls -lh tourism_project/data
 
-    - name: Run model training
-      run: |
-        python tourism_project/model_building/model_train.py
+      - name: Run model training
+        run: |
+          python tourism_project/model_building/model_train.py
 
-    - name: Verify saved model
-      run: |
-        echo "Model files:"
-        ls -lh tourism_project/model_building/
+      - name: Verify saved model
+        run: |
+          echo "Model files:"
+          ls -lh tourism_project/model_building/
 
-    - name: Upload MLflow tracking
-      uses: actions/upload-artifact@v4
-      with:
-        name: mlflow-tracking
-        path: mlruns/
+      - name: Upload MLflow tracking
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-tracking
+          path: mlruns/
 
-    - name: Commit best model
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Upload trained model
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: tourism_project/model_building/best_model.joblib
 
-        git add tourism_project/model_building/best_model.joblib
-
-        if git diff --cached --quiet; then
-          echo "No model changes to commit."
-        else
-          git commit -m "Update best model"
-          git push
-        fi
 
   # -----------------------------------------
   # STEP 6: APPLICATION VALIDATION
@@ -156,6 +154,8 @@ jobs:
 
       - name: Verify deployment files
         run: |
+          echo "Checking deployment files..."
+
           test -f app.py
           test -f requirements.txt
           test -f tourism_project/model_building/best_model.joblib
@@ -170,22 +170,42 @@ jobs:
         run: |
           python -m py_compile app.py
 
-  permissions:
-  contents: write
-  - name: Configure Git
-  run: |
-    git config user.name "github-actions[bot]"
-    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-    - name: Commit updated model
-  run: |
-    git add tourism_project/model_building/best_model.joblib
 
-    if git diff --cached --quiet; then
-      echo "No model changes to commit."
-    else
-      git commit -m "Update trained model [skip ci]"
-      git push origin HEAD:main
-    fi
-      - name: Validate Streamlit application
+  # -----------------------------------------
+  # STEP 7: PUSH UPDATED MODEL TO MAIN
+  # -----------------------------------------
+
+  update-main:
+
+    runs-on: ubuntu-latest
+
+    needs: app-validation
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download trained model
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: tourism_project/model_building
+
+      - name: Configure Git
         run: |
-          python -m py_compile app.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit updated model
+        run: |
+          git add tourism_project/model_building/best_model.joblib
+
+          if git diff --cached --quiet; then
+            echo "No model changes to commit."
+          else
+            git commit -m "Update trained model [skip ci]"
+            git push origin HEAD:main
+          fi
