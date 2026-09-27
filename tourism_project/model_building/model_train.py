@@ -355,7 +355,8 @@ with mlflow.start_run(
 
     mlflow.sklearn.log_model(
         best_model,
-        "random_forest_model"
+        "random_forest_model",
+         serialization_format="cloudpickle"
     )
 
 
